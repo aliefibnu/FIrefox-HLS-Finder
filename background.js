@@ -7,6 +7,7 @@
  *
  * Detected streams are forwarded to the tab's content script via messaging,
  * so they can be logged directly in that page's console.
+ * Also updates the extension badge with the count of detected streams.
  */
 
 // Store found HLS URLs per tab to avoid duplicate reporting
@@ -44,7 +45,15 @@ function isHlsContentType(contentType) {
   return HLS_CONTENT_TYPES.includes(normalized);
 }
 
-
+/**
+ * Update the extension badge for a tab with the count of detected streams.
+ */
+function updateBadge(tabId) {
+  const count = foundStreamDetails[tabId] ? foundStreamDetails[tabId].length : 0;
+  const text = count > 0 ? String(count) : '';
+  browser.browserAction.setBadgeText({ text, tabId });
+  browser.browserAction.setBadgeBackgroundColor({ color: '#e53e3e', tabId });
+}
 
 /**
  * Track a newly found stream for a tab, avoiding duplicate reports.
@@ -64,6 +73,7 @@ function trackStream(tabId, streamInfo) {
   foundStreams[tabId].add(key);
   foundStreamDetails[tabId].push(streamInfo);
 
+  updateBadge(tabId);
   notifyPopup(tabId);
 }
 
@@ -129,6 +139,7 @@ browser.webRequest.onHeadersReceived.addListener(
 browser.tabs.onRemoved.addListener((tabId) => {
   delete foundStreams[tabId];
   delete foundStreamDetails[tabId];
+  browser.browserAction.setBadgeText({ text: '', tabId });
 });
 
 browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -136,6 +147,7 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === 'loading' && changeInfo.url) {
     delete foundStreams[tabId];
     delete foundStreamDetails[tabId];
+    browser.browserAction.setBadgeText({ text: '', tabId });
   }
 });
 
@@ -156,6 +168,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = message.tabId;
     delete foundStreams[tabId];
     delete foundStreamDetails[tabId];
+    browser.browserAction.setBadgeText({ text: '', tabId });
     sendResponse({ ok: true });
     return true;
   }

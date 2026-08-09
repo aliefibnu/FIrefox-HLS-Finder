@@ -3,7 +3,7 @@
  *
  * - Fetches current tab's detected streams from the background on open.
  * - Listens for real-time stream updates while popup is open.
- * - Renders each stream as an interactive row with copy button.
+ * - Renders each stream as an interactive row with copy & open-in-tab buttons.
  * - Deduplicates by URL.
  */
 
@@ -88,6 +88,12 @@
     <polyline points="20 6 9 17 4 12"/>
   </svg>`;
 
+  const ICON_OPEN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+    <polyline points="15 3 21 3 21 9"/>
+    <line x1="10" y1="14" x2="21" y2="3"/>
+  </svg>`;
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   function createStreamItem(stream, index) {
@@ -106,14 +112,27 @@
             ${sourceIcon(stream)}
             ${sourceLabel(stream)}
           </span>
-          ${stream.contentType ? `<span class="item-type" style="font-size:10px;color:var(--c-text-3)">${escapeHtml(stream.contentType.split(";")[0])}</span>` : ""}
+          ${stream.contentType ? `<span class="item-type" style="font-size:11px;color:var(--c-text-3)">${escapeHtml(stream.contentType.split(";")[0])}</span>` : ""}
         </div>
       </div>
-      <button class="btn-copy" title="Copy URL" aria-label="Copy URL to clipboard">
-        ${ICON_COPY}
-      </button>
+      <div class="item-actions">
+        <button class="btn-icon btn-open" title="View URL in new tab" aria-label="Open URL in new tab">
+          ${ICON_OPEN}
+        </button>
+        <button class="btn-icon btn-copy" title="Copy URL" aria-label="Copy URL to clipboard">
+          ${ICON_COPY}
+        </button>
+      </div>
     `;
 
+    // Open in new tab button
+    const openBtn = item.querySelector(".btn-open");
+    openBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      browser.tabs.create({ url: stream.url, active: true });
+    });
+
+    // Copy button
     const copyBtn = item.querySelector(".btn-copy");
     copyBtn.addEventListener("click", (e) => {
       e.stopPropagation();
