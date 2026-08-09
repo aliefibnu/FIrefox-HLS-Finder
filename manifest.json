@@ -1,0 +1,33 @@
+{
+  "manifest_version": 2,
+  "name": "HLS Finder",
+  "version": "1.0.0",
+  "description": "Detects and logs HLS (.m3u8) streams loaded on any web page to the browser console.",
+  "author": "HLS Finder",
+
+  "permissions": [
+    "webRequest",
+    "tabs",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+
+  "browser_action": {
+    "default_title": "HLS Finder",
+    "default_popup": "popup/popup.html"
+  },
+
+  "icons": {}
+}

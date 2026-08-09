@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HLS Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Tokens ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --c-bg:         #ffffff;
+      --c-surface:    #f8f8f8;
+      --c-border:     #e8e8e8;
+      --c-border-hover: #d0d0d0;
+      --c-text:       #111111;
+      --c-text-2:     #555555;
+      --c-text-3:     #999999;
+      --c-accent:     #e53e3e;
+      --c-accent-bg:  #fff5f5;
+      --c-accent-border: #fed7d7;
+      --c-green:      #22c55e;
+      --c-blue:       #2563eb;
+      --c-hover:      #f3f3f3;
+      --c-pressed:    #eeeeee;
+
+      --r-sm:   6px;
+      --r-md:   8px;
+      --r-lg:   12px;
+      --r-pill: 99px;
+
+      --font-sans: 'Inter', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04);
+    }
+
+    /* ── Base ─────────────────────────────────────────────────────────── */
+    html { font-size: 14px; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--c-bg);
+      color: var(--c-text);
+      width: 380px;
+      min-height: 120px;
+      max-height: 540px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px 13px;
+      border-bottom: 1px solid var(--c-border);
+      background: var(--c-bg);
+      flex-shrink: 0;
+    }
+
+    .header-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--r-md);
+      background: var(--c-accent-bg);
+      border: 1px solid var(--c-accent-border);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    /* SVG antenna icon */
+    .header-icon svg { width: 15px; height: 15px; }
+
+    .header-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--c-text);
+      letter-spacing: -0.01em;
+      line-height: 1;
+    }
+
+    .header-sub {
+      font-size: 11px;
+      color: var(--c-text-3);
+      margin-top: 2px;
+    }
+
+    .header-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--c-text-3);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--c-green);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+      animation: ping 2s ease-in-out infinite;
+    }
+
+    @keyframes ping {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50%       { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+    }
+
+    /* ── Empty State ──────────────────────────────────────────────────── */
+    .empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 36px 24px;
+      text-align: center;
+    }
+
+    .empty-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--r-lg);
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      display: grid;
+      place-items: center;
+      margin-bottom: 4px;
+    }
+
+    .empty-icon svg { width: 20px; height: 20px; opacity: 0.35; }
+
+    .empty-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--c-text-2);
+    }
+
+    .empty-desc {
+      font-size: 12px;
+      color: var(--c-text-3);
+      line-height: 1.6;
+    }
+
+    /* ── Stream List ──────────────────────────────────────────────────── */
+    .stream-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 8px;
+
+      /* Modern scrollbar */
+      --scrollbar-thumb: #d8d8d8;
+      --scrollbar-track: transparent;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+      scrollbar-width: thin;
+    }
+
+    @supports not (scrollbar-color: auto) {
+      .stream-list::-webkit-scrollbar { width: 4px; }
+      .stream-list::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 99px; }
+      .stream-list::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+    }
+
+    /* ── Stream Item ──────────────────────────────────────────────────── */
+    .stream-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: var(--r-md);
+      border: 1px solid transparent;
+      transition: background 0.1s, border-color 0.1s;
+      position: relative;
+      cursor: default;
+      /* entrance animation */
+      animation: slideIn 0.18s ease-out both;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .stream-item:hover {
+      background: var(--c-hover);
+      border-color: var(--c-border);
+    }
+
+    .stream-item + .stream-item { margin-top: 2px; }
+
+    /* Divider between items */
+    .stream-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 10px;
+      right: 10px;
+      height: 1px;
+      background: var(--c-border);
+      opacity: 0;
+    }
+
+    /* ── Badge ────────────────────────────────────────────────────────── */
+    .badge {
+      flex-shrink: 0;
+      margin-top: 1px;
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      padding: 2px 6px;
+      border-radius: var(--r-pill);
+      line-height: 1.5;
+    }
+
+    .badge-hls {
+      background: var(--c-accent-bg);
+      color: var(--c-accent);
+      border: 1px solid var(--c-accent-border);
+    }
+
+    .badge-src {
+      background: #eff6ff;
+      color: #3b82f6;
+      border: 1px solid #bfdbfe;
+      font-size: 9px;
+    }
+
+    /* ── Item content ─────────────────────────────────────────────────── */
+    .item-body { flex: 1; min-width: 0; }
+
+    .item-url {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--c-text-2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.4;
+    }
+
+    .item-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 3px;
+    }
+
+    .item-time {
+      font-size: 10px;
+      color: var(--c-text-3);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .item-type {
+      font-size: 10px;
+      color: var(--c-text-3);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .item-type svg { width: 9px; height: 9px; opacity: 0.5; }
+
+    /* ── Copy Button ──────────────────────────────────────────────────── */
+    .btn-copy {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--c-border);
+      background: var(--c-bg);
+      border-radius: var(--r-sm);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+      color: var(--c-text-3);
+      align-self: center;
+    }
+
+    .btn-copy svg { width: 13px; height: 13px; }
+
+    .btn-copy:hover {
+      background: var(--c-surface);
+      border-color: var(--c-border-hover);
+      color: var(--c-text);
+    }
+
+    .btn-copy:active {
+      background: var(--c-pressed);
+    }
+
+    .btn-copy.copied {
+      border-color: #86efac;
+      color: #16a34a;
+      background: #f0fdf4;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
+    .footer {
+      flex-shrink: 0;
+      border-top: 1px solid var(--c-border);
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--c-bg);
+    }
+
+    .footer-count {
+      font-size: 11.5px;
+      color: var(--c-text-3);
+    }
+
+    .footer-count strong {
+      color: var(--c-text-2);
+      font-weight: 600;
+    }
+
+    .btn-clear {
+      background: none;
+      border: none;
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      color: var(--c-text-3);
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.1s, background 0.1s;
+    }
+
+    .btn-clear:hover { color: var(--c-accent); background: var(--c-accent-bg); }
+
+    /* ── Toast ────────────────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 52px;
+      left: 50%;
+      transform: translateX(-50%) translateY(6px);
+      background: var(--c-text);
+      color: #fff;
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: var(--r-pill);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+      box-shadow: var(--shadow-md);
+      z-index: 100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Separator group label (optional future feature) ─────────────── */
+    .section-label {
+      padding: 8px 10px 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--c-text-3);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="header">
+  <div class="header-icon" aria-hidden="true">
+    <!-- Antenna / signal icon -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+      <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+      <line x1="12" y1="20" x2="12" y2="20"/>
+    </svg>
+  </div>
+  <div>
+    <div class="header-title">HLS Finder</div>
+    <div class="header-sub" id="headerSub">Monitoring network requests</div>
+  </div>
+  <div class="header-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusLabel">Active</span>
+  </div>
+</header>
+
+<!-- ── Stream list / Empty state ── -->
+<div class="stream-list" id="streamList" role="list" aria-label="Detected HLS streams">
+  <!-- Empty state (shown by default) -->
+  <div class="empty" id="emptyState">
+    <div class="empty-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <polygon points="10 8 16 12 10 16 10 8"/>
+      </svg>
+    </div>
+    <div class="empty-title">No HLS streams detected</div>
+    <div class="empty-desc">Open a page that plays HLS video.<br/>Streams will appear here automatically.</div>
+  </div>
+</div>
+
+<!-- ── Footer ── -->
+<footer class="footer" id="footer" style="display:none">
+  <div class="footer-count"><strong id="countVal">0</strong> stream<span id="countPlural">s</span> found</div>
+  <button class="btn-clear" id="btnClear" aria-label="Clear all streams">Clear</button>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="popup.js"></script>
+</body>
+</html>
