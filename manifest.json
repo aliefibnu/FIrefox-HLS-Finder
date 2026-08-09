@@ -5,11 +5,7 @@
   "description": "Detects and logs all video media (MP4, HLS, DASH, WebM, MPEG-TS, MKV, etc.) loaded on any web page.",
   "author": "HLS Finder",
 
-  "permissions": [
-    "webRequest",
-    "tabs",
-    "<all_urls>"
-  ],
+  "permissions": ["webRequest", "tabs", "downloads", "<all_urls>"],
 
   "background": {
     "scripts": ["background.js"],
@@ -40,5 +36,10 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "addon-kustom-anda@domain.local"
+    }
   }
 }

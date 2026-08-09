@@ -95,6 +95,18 @@
     <line x1="10" y1="14" x2="21" y2="3"/>
   </svg>`;
 
+  const ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>`;
+
+  const ICON_DOWNLOADING = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <polyline points="8 12 12 16 16 12"/>
+    <line x1="12" y1="8" x2="12" y2="16"/>
+  </svg>`;
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   function createStreamItem(stream, index) {
@@ -128,6 +140,9 @@
         </div>
       </div>
       <div class="item-actions">
+        <button class="btn-icon btn-download" title="Download file" aria-label="Download media file">
+          ${ICON_DOWNLOAD}
+        </button>
         <button class="btn-icon btn-open" title="View URL in new tab" aria-label="Open URL in new tab">
           ${ICON_OPEN}
         </button>
@@ -136,6 +151,53 @@
         </button>
       </div>
     `;
+
+    // Download button
+    const dlBtn = item.querySelector(".btn-download");
+    dlBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (dlBtn.disabled) return;
+
+      dlBtn.innerHTML = ICON_DOWNLOADING;
+      dlBtn.classList.add("downloading");
+      dlBtn.disabled = true;
+      dlBtn.title = "Downloading…";
+
+      // Derive a sensible filename from the URL
+      let filename = '';
+      try {
+        const pathname = new URL(stream.url).pathname;
+        filename = pathname.split('/').pop().split('?')[0] || 'video';
+        if (!filename.includes('.')) filename += '.mp4';
+      } catch {
+        filename = 'video.mp4';
+      }
+
+      browser.downloads.download({
+        url: stream.url,
+        filename,
+        saveAs: false,
+      }).then(() => {
+        dlBtn.innerHTML = ICON_CHECK;
+        dlBtn.classList.remove("downloading");
+        dlBtn.classList.add("copied"); // reuse green style
+        dlBtn.title = "Download started!";
+        showToast("Download started");
+        setTimeout(() => {
+          dlBtn.innerHTML = ICON_DOWNLOAD;
+          dlBtn.classList.remove("copied");
+          dlBtn.disabled = false;
+          dlBtn.title = "Download file";
+        }, 2500);
+      }).catch((err) => {
+        dlBtn.innerHTML = ICON_DOWNLOAD;
+        dlBtn.classList.remove("downloading");
+        dlBtn.disabled = false;
+        dlBtn.title = "Download file";
+        showToast("Download failed");
+        console.error('[Media Finder] Download error:', err);
+      });
+    });
 
     // Open in new tab button
     const openBtn = item.querySelector(".btn-open");

@@ -13,7 +13,9 @@
 const foundStreams = {};
 
 // Video file extensions to detect in URL path/query
-const VIDEO_URL_PATTERN = /\.(m3u8|mpd|ts|mp4|webm|mkv|mov|avi|flv|wmv|m4v|ogv|3gp|3g2)(\?.*)?$/i;
+// NOTE: .ts is intentionally excluded — individual HLS transport segments are noise.
+// .m4s is also excluded — DASH segments. We only want the manifest (.mpd) or full file.
+const VIDEO_URL_PATTERN = /\.(m3u8|mpd|mp4|webm|mkv|mov|avi|flv|wmv|m4v|ogv|3gp|3g2)(\?.*)?$/i;
 
 // Known video/stream MIME types
 const VIDEO_CONTENT_TYPES = [
@@ -35,10 +37,70 @@ const VIDEO_CONTENT_TYPES = [
   'video/3gpp',
   'video/3gpp2',
   'video/mpeg',
-  'video/mp2t',
   'video/x-ms-wmv',
   'video/x-m4v',
+  // Intentionally excluded: video/mp2t (raw TS segments)
 ];
+
+// Ad/tracking network hostnames — requests from these are skipped
+const AD_HOSTNAMES = [
+  'doubleclick.net', 'googlesyndication.com', 'googleadservices.com',
+  'ads.youtube.com', 'pagead2.googlesyndication.com',
+  'imasdk.googleapis.com', 'ad.doubleclick.net',
+  'securepubads.g.doubleclick.net', 'adservice.google.com',
+  'amazon-adsystem.com', 'adsystem.amazon.com',
+  'media.net', 'cdn.media.net', 'adnxs.com',
+  'rubiconproject.com', 'openx.net', 'pubmatic.com',
+  'taboola.com', 'outbrain.com', 'criteo.com',
+  'scorecardresearch.com', 'rlcdn.com', 'moatads.com',
+];
+
+// Path patterns that indicate a stream segment or thumbnail preview, not a full video
+const SEGMENT_PATH_PATTERNS = [
+  /\/seg(ment)?[-_]?\d+/i,           // /segment1, /seg-001
+  /\/chunk[-_]?\d+/i,                // /chunk-0, /chunk_1
+  /\/frag(ment)?[-_]?\d+/i,          // /frag0, /fragment-1
+  /\/part[-_]?\d+/i,                 // /part1
+  /\/sq\/\d+/i,                      // YouTube /sq/1234
+  /\/range\/\d+-\d+/i,               // Byte-range segment requests
+  /[-_]\d{4,}\.(mp4|m4v|webm)$/i,   // filename-0001.mp4, chunk_00120.mp4
+  /\/\d{5,}\.(mp4|m4v|webm|ts)$/i,  // /000123.mp4 numbered chunks
+  /\/storyboard/i,                   // Storyboard/thumbnail sprites
+  /\/thumbs?\//i,                    // Thumbnail directories
+  /\/preview/i,                      // Preview clips
+  /\/animated_thumbnail/i,           // Animated thumbnails (YouTube)
+  /[?&](format=dash|itag=\d+)/i,     // YouTube DASH segment params without full path
+];
+
+/**
+ * Returns true if the URL is an ad, segment, thumbnail, or otherwise
+ * "noise" — not a primary video that a user would want.
+ */
+function isUnnecessaryMedia(url) {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    const pathname = parsed.pathname;
+    const full = pathname + parsed.search;
+
+    // Block ad network domains
+    if (AD_HOSTNAMES.some((ad) => hostname === ad || hostname.endsWith('.' + ad))) {
+      return true;
+    }
+
+    // Block obvious segment/chunk/thumbnail path patterns
+    if (SEGMENT_PATH_PATTERNS.some((re) => re.test(full))) {
+      return true;
+    }
+
+    // Block video/mp2t Content-Type (raw TS transport segments)
+    // (handled separately in the header listener)
+
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Determine media type label from URL or MIME type.
@@ -138,7 +200,7 @@ function notifyPopup(tabId) {
 
 browser.webRequest.onBeforeRequest.addListener(
   (details) => {
-    if (isVideoUrl(details.url)) {
+    if (isVideoUrl(details.url) && !isUnnecessaryMedia(details.url)) {
       const mediaType = getMediaType(details.url, null);
       const streamInfo = {
         url: details.url,
@@ -164,7 +226,14 @@ browser.webRequest.onHeadersReceived.addListener(
       (h) => h.name.toLowerCase() === 'content-type'
     );
 
-    if (contentTypeHeader && isVideoContentType(contentTypeHeader.value)) {
+    if (!contentTypeHeader) return;
+
+    const ct = contentTypeHeader.value.toLowerCase().split(';')[0].trim();
+
+    // Skip raw TS segments (video/mp2t) — these are stream chunks, not full videos
+    if (ct === 'video/mp2t') return;
+
+    if (isVideoContentType(contentTypeHeader.value) && !isUnnecessaryMedia(details.url)) {
       const mediaType = getMediaType(details.url, contentTypeHeader.value);
       const streamInfo = {
         url: details.url,

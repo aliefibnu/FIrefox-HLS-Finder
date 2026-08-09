@@ -3,10 +3,10 @@
  *
  * Runs in the context of every web page.
  * Detects video media via:
- *   1. Messages from background.js (webRequest interception)
- *   2. In-page XHR / fetch() patching (catches player SDK requests)
- *   3. <video> / <source> element observation (catches direct src attributes)
+ *   1. In-page XHR / fetch() patching (catches player SDK requests)
+ *   2. <video> / <source> element observation (catches direct src attributes)
  *
+ * Filters out: stream segments, ad-network videos, thumbnail previews.
  * All output goes to the popup GUI — no console logging.
  */
 
@@ -14,9 +14,43 @@
   'use strict';
 
   // Video file extensions + stream manifests
-  const VIDEO_PATTERN = /\.(m3u8|mpd|ts|mp4|webm|mkv|mov|avi|flv|wmv|m4v|ogv|3gp|3g2)(\?.*)?$/i;
+  // .ts and .m4s are excluded: they are HLS/DASH segments, not primary video files
+  const VIDEO_PATTERN = /\.(m3u8|mpd|mp4|webm|mkv|mov|avi|flv|wmv|m4v|ogv|3gp|3g2)(\?.*)?$/i;
 
-  const seenUrls = new Set();
+  // Segment/chunk/thumbnail path patterns to ignore
+  const SEGMENT_PATTERNS = [
+    /\/seg(ment)?[-_]?\d+/i,
+    /\/chunk[-_]?\d+/i,
+    /\/frag(ment)?[-_]?\d+/i,
+    /\/part[-_]?\d+/i,
+    /\/sq\/\d+/i,
+    /\/range\/\d+-\d+/i,
+    /[-_]\d{4,}\.(mp4|m4v|webm)$/i,
+    /\/\d{5,}\.(mp4|m4v|webm|ts)$/i,
+    /\/storyboard/i,
+    /\/thumbs?\//i,
+    /\/preview/i,
+    /\/animated_thumbnail/i,
+  ];
+
+  const AD_HOSTNAMES = [
+    'doubleclick.net', 'googlesyndication.com', 'googleadservices.com',
+    'imasdk.googleapis.com', 'amazon-adsystem.com', 'adnxs.com',
+    'taboola.com', 'outbrain.com', 'criteo.com',
+  ];
+
+  function isUnnecessaryMedia(url) {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+      const full = parsed.pathname + parsed.search;
+      if (AD_HOSTNAMES.some((ad) => hostname === ad || hostname.endsWith('.' + ad))) return true;
+      if (SEGMENT_PATTERNS.some((re) => re.test(full))) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  }
 
   /**
    * Determine a short media type label from a URL.
@@ -25,7 +59,7 @@
     try {
       const ext = new URL(url).pathname.split('.').pop().toLowerCase();
       const extMap = {
-        m3u8: 'HLS', mpd: 'DASH', ts: 'MPEG-TS',
+        m3u8: 'HLS', mpd: 'DASH',
         mp4: 'MP4', webm: 'WebM', mkv: 'MKV', mov: 'MOV',
         avi: 'AVI', flv: 'FLV', wmv: 'WMV', m4v: 'M4V',
         ogv: 'OGV', '3gp': '3GP',
@@ -36,11 +70,13 @@
     }
   }
 
+  const seenUrls = new Set();
+
   /**
    * Forward an in-page detected video URL to the background script.
    */
   function reportInPage(url, source) {
-    if (!url || seenUrls.has(url)) return;
+    if (!url) return;
 
     // Resolve relative URLs
     try {
@@ -49,7 +85,17 @@
       return;
     }
 
-    if (!VIDEO_PATTERN.test(new URL(url).pathname)) return;
+    if (seenUrls.has(url)) return;
+
+    // Must match video extension
+    try {
+      if (!VIDEO_PATTERN.test(new URL(url).pathname)) return;
+    } catch {
+      return;
+    }
+
+    // Skip segments, ads, thumbnails
+    if (isUnnecessaryMedia(url)) return;
 
     seenUrls.add(url);
 
@@ -111,13 +157,16 @@
   // Watch for dynamically added/modified video elements
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      // Attribute changes on video elements
+      // Attribute changes on video/source elements
       if (
         mutation.type === 'attributes' &&
         (mutation.attributeName === 'src' || mutation.attributeName === 'currentSrc') &&
         (mutation.target.tagName === 'VIDEO' || mutation.target.tagName === 'SOURCE')
       ) {
-        reportInPage(mutation.target.src || mutation.target.getAttribute('src'), mutation.target.tagName.toLowerCase() + '-element');
+        reportInPage(
+          mutation.target.src || mutation.target.getAttribute('src'),
+          mutation.target.tagName.toLowerCase() + '-element'
+        );
       }
 
       // New nodes added to DOM

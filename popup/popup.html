@@ -342,6 +342,26 @@
       color: var(--c-blue);
     }
 
+    /* Download button — green tint on hover */
+    .btn-icon.btn-download:hover {
+      background: #f0fdf4;
+      border-color: #86efac;
+      color: #16a34a;
+    }
+
+    /* Downloading state */
+    .btn-icon.downloading {
+      border-color: #86efac;
+      color: #16a34a;
+      background: #f0fdf4;
+      animation: pulse-dl 0.8s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-dl {
+      from { opacity: 1; }
+      to   { opacity: 0.5; }
+    }
+
     /* ── Footer ───────────────────────────────────────────────────────── */
     .footer {
       flex-shrink: 0;
