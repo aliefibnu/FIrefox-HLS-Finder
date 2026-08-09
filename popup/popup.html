@@ -220,6 +220,36 @@
       border: 1px solid var(--c-accent-border);
     }
 
+    .badge-dash {
+      background: #faf5ff;
+      color: #7c3aed;
+      border: 1px solid #ddd6fe;
+    }
+
+    .badge-ts {
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid #fed7aa;
+    }
+
+    .badge-mp4 {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+
+    .badge-webm {
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+
+    .badge-video {
+      background: #f8fafc;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+
     .badge-src {
       background: #eff6ff;
       color: #3b82f6;
@@ -398,7 +428,7 @@
     </svg>
   </div>
   <div>
-    <div class="header-title">HLS Finder</div>
+    <div class="header-title">Media Finder</div>
     <div class="header-sub" id="headerSub">Monitoring network requests</div>
   </div>
   <div class="header-status">
@@ -408,7 +438,7 @@
 </header>
 
 <!-- ── Stream list / Empty state ── -->
-<div class="stream-list" id="streamList" role="list" aria-label="Detected HLS streams">
+<div class="stream-list" id="streamList" role="list" aria-label="Detected video media">
   <!-- Empty state (shown by default) -->
   <div class="empty" id="emptyState">
     <div class="empty-icon" aria-hidden="true">
@@ -417,14 +447,14 @@
         <polygon points="10 8 16 12 10 16 10 8"/>
       </svg>
     </div>
-    <div class="empty-title">No HLS streams detected</div>
-    <div class="empty-desc">Open a page that plays HLS video.<br/>Streams will appear here automatically.</div>
+    <div class="empty-title">No video media detected</div>
+    <div class="empty-desc">Open a page that plays video content.<br/>MP4, HLS, DASH, WebM, and more will appear here.</div>
   </div>
 </div>
 
 <!-- ── Footer ── -->
 <footer class="footer" id="footer" style="display:none">
-  <div class="footer-count"><strong id="countVal">0</strong> stream<span id="countPlural">s</span> found</div>
+  <div class="footer-count"><strong id="countVal">0</strong> media<span id="countPlural">s</span> found</div>
   <button class="btn-clear" id="btnClear" aria-label="Clear all streams">Clear all</button>
 </footer>
 

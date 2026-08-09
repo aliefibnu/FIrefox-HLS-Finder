@@ -44,6 +44,7 @@
   function sourceLabel(stream) {
     if (stream.detectedBy === "content-type-header") return "Header";
     if (stream.detectedBy === "in-page-intercept") return stream.type || "XHR";
+    if (stream.detectedBy === "video-element") return "<video>";
     return "URL";
   }
 
@@ -102,8 +103,19 @@
     item.style.animationDelay = `${Math.min(index * 30, 150)}ms`;
     item.setAttribute("role", "listitem");
 
+    const mediaType = stream.mediaType || 'VIDEO';
+    // Color-code badge by media type
+    const badgeColors = {
+      HLS: 'badge-hls',
+      DASH: 'badge-dash',
+      'MPEG-TS': 'badge-ts',
+      MP4: 'badge-mp4',
+      WebM: 'badge-webm',
+    };
+    const badgeClass = badgeColors[mediaType] || 'badge-video';
+
     item.innerHTML = `
-      <span class="badge badge-hls">HLS</span>
+      <span class="badge ${badgeClass}">${escapeHtml(mediaType)}</span>
       <div class="item-body">
         <div class="item-url" title="${escapeHtml(stream.url)}">${escapeHtml(stream.url)}</div>
         <div class="item-meta">
@@ -173,6 +185,10 @@
     if (hostname) {
       headerSub.textContent = `Monitoring · ${hostname}`;
     }
+
+    // Update count label
+    countVal.textContent = streams.length;
+    countPlural.textContent = streams.length === 1 ? "" : "s";
   }
 
   // ── Copy to clipboard ─────────────────────────────────────────────────────

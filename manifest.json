@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
-  "name": "HLS Finder",
-  "version": "1.0.0",
-  "description": "Detects and logs HLS (.m3u8) streams loaded on any web page to the browser console.",
+  "name": "Media Finder",
+  "version": "2.0.0",
+  "description": "Detects and logs all video media (MP4, HLS, DASH, WebM, MPEG-TS, MKV, etc.) loaded on any web page.",
   "author": "HLS Finder",
 
   "permissions": [

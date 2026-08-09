@@ -1,48 +1,93 @@
 /**
- * HLS Finder — Background Script
+ * Media Finder — Background Script
  *
- * Intercepts all network requests and detects HLS streams by:
- * 1. URL pattern matching (.m3u8, application/x-mpegurl, etc.)
- * 2. Response Content-Type header checking
+ * Intercepts all network requests and detects video media by:
+ * 1. URL pattern matching (video file extensions)
+ * 2. Response Content-Type header checking (video/* MIME types)
  *
- * Detected streams are forwarded to the tab's content script via messaging,
- * so they can be logged directly in that page's console.
- * Also updates the extension badge with the count of detected streams.
+ * Detected media are forwarded to the popup GUI via messaging.
+ * Also updates the extension badge with the count of detected media.
  */
 
-// Store found HLS URLs per tab to avoid duplicate reporting
+// Store found media URLs per tab to avoid duplicate reporting
 const foundStreams = {};
 
-// HLS URL pattern: matches .m3u8 in path or query string
-const HLS_URL_PATTERN = /\.m3u8(\?.*)?$/i;
+// Video file extensions to detect in URL path/query
+const VIDEO_URL_PATTERN = /\.(m3u8|mpd|ts|mp4|webm|mkv|mov|avi|flv|wmv|m4v|ogv|3gp|3g2)(\?.*)?$/i;
 
-// HLS content types
-const HLS_CONTENT_TYPES = [
+// Known video/stream MIME types
+const VIDEO_CONTENT_TYPES = [
+  // HLS
   'application/x-mpegurl',
   'application/vnd.apple.mpegurl',
   'audio/x-mpegurl',
   'audio/mpegurl',
+  // DASH
+  'application/dash+xml',
+  // Generic video MIME types
+  'video/mp4',
+  'video/webm',
+  'video/ogg',
+  'video/quicktime',
+  'video/x-msvideo',
+  'video/x-flv',
+  'video/x-matroska',
+  'video/3gpp',
+  'video/3gpp2',
+  'video/mpeg',
+  'video/mp2t',
+  'video/x-ms-wmv',
+  'video/x-m4v',
 ];
 
 /**
- * Check if a URL looks like an HLS stream based on its path.
+ * Determine media type label from URL or MIME type.
  */
-function isHlsUrl(url) {
+function getMediaType(url, contentType) {
+  if (contentType) {
+    const ct = contentType.toLowerCase().split(';')[0].trim();
+    if (ct.includes('mpegurl') || ct.includes('x-mpegurl')) return 'HLS';
+    if (ct === 'application/dash+xml') return 'DASH';
+    if (ct === 'video/mp2t') return 'MPEG-TS';
+    if (ct.startsWith('video/')) {
+      const sub = ct.split('/')[1].split('+')[0].toUpperCase();
+      return sub;
+    }
+  }
   try {
-    const parsed = new URL(url);
-    return HLS_URL_PATTERN.test(parsed.pathname) || HLS_URL_PATTERN.test(parsed.search);
+    const ext = new URL(url).pathname.split('.').pop().toLowerCase();
+    const extMap = {
+      m3u8: 'HLS', mpd: 'DASH', ts: 'MPEG-TS',
+      mp4: 'MP4', webm: 'WebM', mkv: 'MKV', mov: 'MOV',
+      avi: 'AVI', flv: 'FLV', wmv: 'WMV', m4v: 'M4V',
+      ogv: 'OGV', '3gp': '3GP',
+    };
+    return extMap[ext] || 'VIDEO';
   } catch {
-    return HLS_URL_PATTERN.test(url);
+    return 'VIDEO';
   }
 }
 
 /**
- * Check if a Content-Type header value matches known HLS types.
+ * Check if a URL looks like a video media file based on its path.
  */
-function isHlsContentType(contentType) {
+function isVideoUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return VIDEO_URL_PATTERN.test(parsed.pathname) || VIDEO_URL_PATTERN.test(parsed.search);
+  } catch {
+    return VIDEO_URL_PATTERN.test(url);
+  }
+}
+
+/**
+ * Check if a Content-Type header value matches known video types.
+ */
+function isVideoContentType(contentType) {
   if (!contentType) return false;
   const normalized = contentType.toLowerCase().split(';')[0].trim();
-  return HLS_CONTENT_TYPES.includes(normalized);
+  // Match any video/* MIME type or explicit list
+  return normalized.startsWith('video/') || VIDEO_CONTENT_TYPES.includes(normalized);
 }
 
 /**
@@ -93,12 +138,14 @@ function notifyPopup(tabId) {
 
 browser.webRequest.onBeforeRequest.addListener(
   (details) => {
-    if (isHlsUrl(details.url)) {
+    if (isVideoUrl(details.url)) {
+      const mediaType = getMediaType(details.url, null);
       const streamInfo = {
         url: details.url,
         tabId: details.tabId,
         frameId: details.frameId,
         type: details.type,
+        mediaType,
         detectedBy: 'url-pattern',
         timestamp: new Date().toISOString(),
       };
@@ -117,13 +164,15 @@ browser.webRequest.onHeadersReceived.addListener(
       (h) => h.name.toLowerCase() === 'content-type'
     );
 
-    if (contentTypeHeader && isHlsContentType(contentTypeHeader.value)) {
+    if (contentTypeHeader && isVideoContentType(contentTypeHeader.value)) {
+      const mediaType = getMediaType(details.url, contentTypeHeader.value);
       const streamInfo = {
         url: details.url,
         tabId: details.tabId,
         frameId: details.frameId,
         type: details.type,
         contentType: contentTypeHeader.value,
+        mediaType,
         detectedBy: 'content-type-header',
         timestamp: new Date().toISOString(),
       };
@@ -173,8 +222,8 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  // Content script: in-page XHR/fetch detected HLS URL
-  if (message.type === 'IN_PAGE_HLS' && sender.tab) {
+  // Content script: in-page XHR/fetch detected video URL
+  if (message.type === 'IN_PAGE_MEDIA' && sender.tab) {
     const tabId = sender.tab.id;
     const streamInfo = { ...message.stream, tabId };
     trackStream(tabId, streamInfo);
